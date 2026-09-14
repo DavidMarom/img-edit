@@ -2,7 +2,7 @@ import AppKit
 
 final class CanvasView: NSView {
     let document: EditorDocument
-    let scale: CGFloat
+    var scale: CGFloat
 
     init(document: EditorDocument, scale: CGFloat) {
         self.document = document

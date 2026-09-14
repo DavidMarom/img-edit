@@ -44,7 +44,9 @@ final class EditorDocument {
 
     private func normalized(_ a: CGPoint, _ b: CGPoint) -> CGRect {
         let rect = CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(a.x - b.x), height: abs(a.y - b.y))
-        return rect.intersection(imageBounds())
+        // Round to integer pixel coords so the piece this rect is cut from starts out
+        // pixel-aligned — a fractional origin forces resampling (blur) when it's later drawn.
+        return rect.intersection(imageBounds()).integral
     }
 
     // MARK: Tool switching / global actions
@@ -100,7 +102,9 @@ final class EditorDocument {
         case .drawingSelection(let start, _):
             moveState = .drawingSelection(start: start, current: point)
         case .floating(let piece, _, let base, .some(let anchor)):
-            let newOrigin = CGPoint(x: point.x - anchor.x, y: point.y - anchor.y)
+            // Snap to integer pixel coords: a fractional origin forces CoreGraphics to
+            // resample the piece on every draw, blurring it (and baking that blur in on commit).
+            let newOrigin = CGPoint(x: (point.x - anchor.x).rounded(), y: (point.y - anchor.y).rounded())
             moveState = .floating(piece: piece, currentOrigin: newOrigin, baseWithHole: base, dragAnchorOffset: anchor)
         case .floating, .idle:
             break

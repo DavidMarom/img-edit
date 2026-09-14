@@ -26,12 +26,13 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         let contentSize = CGSize(width: viewSize.width, height: viewSize.height + toolbarHeight)
         let window = NSWindow(
             contentRect: CGRect(origin: .zero, size: contentSize),
-            styleMask: [.titled, .closable, .miniaturizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "ImgEdit"
         window.isReleasedWhenClosed = false
+        window.contentMinSize = CGSize(width: 200, height: 200 + toolbarHeight)
         window.center()
 
         super.init(window: window)
@@ -87,6 +88,22 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         onClose?()
+    }
+
+    /// Window is user-resizable independent of the image's own pixel size: whenever the
+    /// content area changes, rescale the canvas to fit the space now available under the toolbar.
+    func windowDidResize(_ notification: Notification) {
+        guard let contentView = window?.contentView else { return }
+        let imageSize = editorDocument.committed.pixelSize
+        let available = CGSize(width: contentView.bounds.width, height: max(0, contentView.bounds.height - toolbarHeight))
+        guard available.width > 0, available.height > 0 else { return }
+
+        let scale = min(1.0, min(available.width / imageSize.width, available.height / imageSize.height))
+        let viewSize = CGSize(width: (imageSize.width * scale).rounded(), height: (imageSize.height * scale).rounded())
+
+        canvasView.scale = scale
+        canvasView.frame = CGRect(x: 0, y: toolbarHeight, width: viewSize.width, height: viewSize.height)
+        canvasView.needsDisplay = true
     }
 }
 
