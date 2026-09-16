@@ -3,6 +3,7 @@ import CoreGraphics
 enum Tool {
     case move
     case crop
+    case pen
 }
 
 enum MoveState {
@@ -76,6 +77,47 @@ final class EditorDocument {
     func cancelPending() {
         moveState = .idle
         cropState = .idle
+    }
+
+    /// True while there's a selection in flight: a marquee being dragged out, a
+    /// floating move piece, or a crop rectangle being drawn/adjusted.
+    var hasSelection: Bool {
+        if case .idle = moveState, case .idle = cropState { return false }
+        return true
+    }
+
+    /// Clears the current selection without discarding any pixels already moved: a
+    /// floating move piece is baked into `committed` at wherever it currently sits
+    /// (not reverted to where the selection started), while an in-progress crop
+    /// rectangle — which hasn't touched any pixels yet — is simply discarded.
+    func deselect() {
+        if case .floating(let piece, let origin, let base, _) = moveState {
+            base.draw(image: piece, at: origin)
+            committed = base
+        }
+        moveState = .idle
+        cropState = .idle
+    }
+
+    /// True when `point` lands outside the active tool's current selection (a floating
+    /// move piece, or an adjustable crop rect and its resize handles). The caller uses
+    /// this to tell a plain click there (which should just deselect) apart from a
+    /// click-drag (which should commit the old selection and start a new one).
+    func isOutsideSelection(at point: CGPoint) -> Bool {
+        switch activeTool {
+        case .move:
+            guard case .floating(let piece, let origin, _, _) = moveState else { return false }
+            let pieceRect = CGRect(origin: origin, size: CGSize(width: piece.width, height: piece.height))
+            return !pieceRect.contains(point)
+        case .crop:
+            guard case .adjustable(let rect, _) = cropState else { return false }
+            if corners(of: rect).values.contains(where: { hypot($0.x - point.x, $0.y - point.y) <= handleRadius }) {
+                return false
+            }
+            return !rect.contains(point)
+        case .pen:
+            return false
+        }
     }
 
     // MARK: Move tool
@@ -203,5 +245,28 @@ final class EditorDocument {
         case .idle:
             break
         }
+    }
+
+    // MARK: Pen tool
+
+    /// #FF0000, 1 image pixel thick. Strokes draw straight into `committed` as the
+    /// mouse moves — there's no pending/uncommitted state to bake or cancel.
+    private let penColor = CGColor(red: 1, green: 0, blue: 0, alpha: 1)
+    private let penLineWidth: CGFloat = 1
+    private var penLastPoint: CGPoint?
+
+    func penMouseDown(at point: CGPoint) {
+        committed.strokeLine(from: point, to: point, color: penColor, lineWidth: penLineWidth)
+        penLastPoint = point
+    }
+
+    func penMouseDragged(to point: CGPoint) {
+        guard let last = penLastPoint else { return }
+        committed.strokeLine(from: last, to: point, color: penColor, lineWidth: penLineWidth)
+        penLastPoint = point
+    }
+
+    func penMouseUp(at point: CGPoint) {
+        penLastPoint = nil
     }
 }

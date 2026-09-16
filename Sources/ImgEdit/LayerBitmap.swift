@@ -36,6 +36,10 @@ final class LayerBitmap {
         CGRect(x: rect.minX, y: CGFloat(context.height) - rect.maxY, width: rect.width, height: rect.height)
     }
 
+    private func flipped(_ point: CGPoint) -> CGPoint {
+        CGPoint(x: point.x, y: CGFloat(context.height) - point.y)
+    }
+
     /// rect: top-left-origin pixel coordinates
     func clear(rect: CGRect) {
         context.clear(flipped(rect))
@@ -45,6 +49,18 @@ final class LayerBitmap {
     func draw(image: CGImage, at origin: CGPoint) {
         let rect = CGRect(x: origin.x, y: origin.y, width: CGFloat(image.width), height: CGFloat(image.height))
         context.draw(image, in: flipped(rect))
+    }
+
+    /// from/to: top-left-origin pixel coordinates. Draws a round-capped segment
+    /// (a same-point from/to draws a single dot) directly into the bitmap.
+    func strokeLine(from: CGPoint, to: CGPoint, color: CGColor, lineWidth: CGFloat) {
+        context.setStrokeColor(color)
+        context.setLineWidth(lineWidth)
+        context.setLineCap(.round)
+        context.beginPath()
+        context.move(to: flipped(from))
+        context.addLine(to: flipped(to))
+        context.strokePath()
     }
 
     /// rect: top-left-origin pixel coordinates

@@ -4,6 +4,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
     let editorDocument: EditorDocument
     private let canvasView: CanvasView
     private let toolbarHeight: CGFloat = 44
+    private var deselectButton: NSButton!
     var onClose: (() -> Void)?
 
     init(sourceImage: NSImage) {
@@ -43,6 +44,9 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         canvasView.frame = CGRect(x: 0, y: toolbarHeight, width: viewSize.width, height: viewSize.height)
         contentView.addSubview(makeToolbar(width: contentSize.width))
         window.contentView = contentView
+
+        canvasView.onSelectionChanged = { [weak self] in self?.updateDeselectVisibility() }
+        updateDeselectVisibility()
     }
 
     required init?(coder: NSCoder) { fatalError("unsupported") }
@@ -52,9 +56,18 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         bar.material = .titlebar
         bar.autoresizingMask = [.width]
 
-        let segmented = NSSegmentedControl(labels: ["Move", "Crop"], trackingMode: .selectOne, target: self, action: #selector(toolChanged(_:)))
+        let segmented = NSSegmentedControl(labels: ["", "Crop", "Pen"], trackingMode: .selectOne, target: self, action: #selector(toolChanged(_:)))
         segmented.selectedSegment = 0
-        segmented.frame = CGRect(x: 12, y: (toolbarHeight - 24) / 2, width: 140, height: 24)
+        segmented.frame = CGRect(x: 12, y: (toolbarHeight - 24) / 2, width: 210, height: 24)
+        if let moveIcon = NSImage(systemSymbolName: "rectangle.dashed", accessibilityDescription: "Move") {
+            segmented.setImage(moveIcon, forSegment: 0)
+            segmented.setImageScaling(.scaleProportionallyDown, forSegment: 0)
+        }
+
+        let deselectButton = NSButton(title: "Deselect", target: self, action: #selector(deselect))
+        deselectButton.bezelStyle = .rounded
+        deselectButton.frame = CGRect(x: 234, y: (toolbarHeight - 24) / 2, width: 90, height: 24)
+        self.deselectButton = deselectButton
 
         let saveButton = NSButton(title: "Save to Clipboard", target: self, action: #selector(saveToClipboard))
         saveButton.bezelStyle = .rounded
@@ -62,6 +75,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         saveButton.autoresizingMask = [.minXMargin]
 
         bar.addSubview(segmented)
+        bar.addSubview(deselectButton)
         bar.addSubview(saveButton)
         return bar
     }
@@ -73,8 +87,27 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func toolChanged(_ sender: NSSegmentedControl) {
-        editorDocument.switchTool(sender.selectedSegment == 0 ? .move : .crop)
+        let tool: Tool
+        switch sender.selectedSegment {
+        case 0: tool = .move
+        case 1: tool = .crop
+        default: tool = .pen
+        }
+        editorDocument.switchTool(tool)
         canvasView.needsDisplay = true
+        updateDeselectVisibility()
+    }
+
+    /// Clears the current selection, leaving any moved piece exactly where it
+    /// currently sits, and readies the canvas for a fresh selection.
+    @objc private func deselect() {
+        editorDocument.deselect()
+        canvasView.needsDisplay = true
+        updateDeselectVisibility()
+    }
+
+    private func updateDeselectVisibility() {
+        deselectButton.isHidden = !editorDocument.hasSelection
     }
 
     @objc private func saveToClipboard() {
