@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "ImgEdit",
+    name: "Simple Snap",
     platforms: [.macOS(.v13)],
     targets: [
         .executableTarget(
