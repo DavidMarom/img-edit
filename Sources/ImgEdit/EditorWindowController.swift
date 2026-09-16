@@ -41,7 +41,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
 
         let contentView = FlippedContainerView(frame: CGRect(origin: .zero, size: contentSize))
         contentView.addSubview(canvasView)
-        canvasView.frame = CGRect(x: 0, y: toolbarHeight, width: viewSize.width, height: viewSize.height)
+        canvasView.frame = Self.centeredCanvasFrame(viewSize: viewSize, contentSize: contentSize, toolbarHeight: toolbarHeight)
         contentView.addSubview(makeToolbar(width: contentSize.width))
         window.contentView = contentView
 
@@ -135,8 +135,17 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         let viewSize = CGSize(width: (imageSize.width * scale).rounded(), height: (imageSize.height * scale).rounded())
 
         canvasView.scale = scale
-        canvasView.frame = CGRect(x: 0, y: toolbarHeight, width: viewSize.width, height: viewSize.height)
+        canvasView.frame = Self.centeredCanvasFrame(viewSize: viewSize, contentSize: contentView.bounds.size, toolbarHeight: toolbarHeight)
         canvasView.needsDisplay = true
+    }
+
+    /// Centers the canvas within the area below the toolbar, since the window's
+    /// aspect ratio rarely matches the image's exactly.
+    private static func centeredCanvasFrame(viewSize: CGSize, contentSize: CGSize, toolbarHeight: CGFloat) -> CGRect {
+        let availableHeight = contentSize.height - toolbarHeight
+        let x = (contentSize.width - viewSize.width) / 2
+        let y = toolbarHeight + (availableHeight - viewSize.height) / 2
+        return CGRect(x: x, y: y, width: viewSize.width, height: viewSize.height)
     }
 }
 
